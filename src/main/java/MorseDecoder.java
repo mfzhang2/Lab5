@@ -54,7 +54,14 @@ public class MorseDecoder {
         double[] sampleBuffer = new double[BIN_SIZE * inputFile.getNumChannels()];
         for (int binIndex = 0; binIndex < totalBinCount; binIndex++) {
             // Get the right number of samples from the inputFile
+            inputFile.readFrames(sampleBuffer, BIN_SIZE);
+
             // Sum all the samples together and store them in the returnBuffer
+            double sumSample = 0;
+            for (int i = 0; i < sampleBuffer.length; i++) {
+                sumSample = sampleBuffer[i] + sumSample;
+            }
+            returnBuffer[binIndex] = sumSample;
         }
         return returnBuffer;
     }
@@ -81,13 +88,55 @@ public class MorseDecoder {
          * There are four conditions to handle. Symbols should only be output when you see
          * transitions. You will also have to store how much power or silence you have seen.
          */
+        String dotAndDash = "";
+        int toneLength = 0;
+        final int dashLength = 8;
+        int silenceLength = 0;
+        final int lengthForSpace = 8;
+
+        for (int i = 0; i < powerMeasurements.length; i++) {
+            if (i != 0) {
+                if (powerMeasurements[i] > POWER_THRESHOLD
+                        && powerMeasurements[i - 1] > POWER_THRESHOLD) {
+                    // ispower and waspower
+                    toneLength += 1;
+                } else if (powerMeasurements[i] > POWER_THRESHOLD
+                        && !(powerMeasurements[i - 1] > POWER_THRESHOLD)) {
+                    // ispower and not waspower
+                    if (silenceLength >= lengthForSpace) {
+                        dotAndDash += " ";
+                        toneLength = 1;
+                        silenceLength = 0;
+                    } else {
+                        toneLength = 1;
+                        silenceLength = 0;
+                    }
+                } else if (powerMeasurements[i] < POWER_THRESHOLD
+                        && powerMeasurements[i - 1] < POWER_THRESHOLD) {
+                    // issilence and wassilence
+                    silenceLength += 1;
+                } else if (powerMeasurements[i] < POWER_THRESHOLD
+                        && !(powerMeasurements[i - 1] < POWER_THRESHOLD)) {
+                    // issilence and not wassilence
+                    if (toneLength >= dashLength) {
+                        dotAndDash += "-";
+                        toneLength = 0;
+                        silenceLength = 1;
+                    } else {
+                        toneLength = 0;
+                        silenceLength = 1;
+                    }
+                }
+            }
+        }
+
 
         // if ispower and waspower
         // else if ispower and not waspower
         // else if issilence and wassilence
         // else if issilence and not wassilence
 
-        return "";
+        return dotAndDash;
     }
 
     /**
